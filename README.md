@@ -44,12 +44,12 @@
 **Mapping:** geoJSON, TopoJSON, Shapely/Geopandas
 
 ## 📅 Roadmap
-Milestone	Target Date
-Historical ETL pipeline	2025-05-15
-Basic UI & slider	2025-06-01
-Live-data integration	2025-07-01
-Styling & polish	2025-07-20
-Launch date	2025-08-01
+   -  Milestone	Target Date
+   -  Historical ETL pipeline	2025-05-15
+   -  Basic UI & slider	2025-06-01
+   -  Live-data integration	2025-07-01
+   -  Styling & polish	2025-07-20
+   -  Launch date	2025-08-01
 
 
 📄 License
