@@ -29,4 +29,28 @@
    - Party performance over time  
    - Turnout, blank ballots, invalid votes, etc.  
 
-## 📂 Repository Structure
+## 📂 Repository Structure (In progress)
+
+##  🛠 Architecture & Tech
+
+**Back-end:** Python (FastAPI)
+
+**Front-end:** React + D3 + TailwindCSS
+
+**Data:** Parquet/CSV on S3
+
+**CI/CD:** GitHub Actions → Docker → Kubernetes
+
+**Mapping:** geoJSON, TopoJSON, Shapely/Geopandas
+
+## 📅 Roadmap
+Milestone	Target Date
+Historical ETL pipeline	2025-05-15
+Basic UI & slider	2025-06-01
+Live-data integration	2025-07-01
+Styling & polish	2025-07-20
+Launch date	2025-08-01
+
+
+📄 License
+MIT © Ben Holden
