@@ -1,5 +1,5 @@
 > Interactive election maps & graphics, past and present  
-> **Launch:** 2025-08-01
+> **Initial Launch:** 2025-08-01
 ---
 ## 🚀 Project Overview
 
