@@ -1,56 +1,66 @@
-> Interactive election maps & graphics, past and present  
-> **Initial Launch:** 2025-08-01
----
-## 🚀 Project Overview
+# Democracy Atlas 🌍
 
-**electoral-explorer** is an interactive web app for visualizing Norwegian election results from 1972 through live vote-counting. Built under contract for a major Norwegian news organization (announcement to follow).
+#### How does planet earth govern itself?
 
-- **Slide through time** to see how each county/municipality voted in every election since 1973
-- **Explore public data** about economic and social conditions around the country and correlations with voting patterns
-- **Compare parties** across years and geography  
-- **Watch live results** roll in on election night (September 8, 2025)
-- **Access exit poll results** as they come in.
+Billions of people are regularly encouraged, invited, or otherwise given a chance to have a one-person vote,
+and ostensibly, a say in who rules them. Billions still get no say at all.
 
-## 🎯 Key Features
+For many, it's a chore. For others, it's a right they would sacrifice their life for. 
 
-1. **Historical Data Pipeline**  
-   - Scrape & normalize official election results (1972–2025)  
-   - Store in a standard Parquet/CSV format  
-2. **Live Data Ingestion**  
-   - Connect to the vote-count API for real-time updates  
-   - Smooth incremental updates during vote counting  
-3. **Geographic Mapping**  
-   - Use county & municipality shapefiles  
-   - Interactive choropleth & cartogram views  
-4. **Time Slider UI**  
-   - Seamless year-by-year transition  
-   - “Play” election-night animation  
-5. **Analytics & Charts**  
-   - Party performance over time  
-   - Turnout, blank ballots, invalid votes, etc.  
+In some places, where a person puts ink on a piece of paper changes the course of history. 
+In others, a person's vote is a theatrical tool to lend legitimacy to people who tyrannize them.
 
-## 📂 Repository Structure (In progress)
+### 🌍 Vision
+With the **Democracy Atlas**, I'm building a comprehensive interactive atlas of the state of democracy around the world,
+with a point of departure in political and electoral geography, and election results.
 
-##  🛠 Architecture & Tech
+However, to tell a story, the Atlas will provide *context*. Quality of democracy (or lack thereof). Historical patterns.
+Economic trends, demographic trends, and individual events. With the aim to provide an exploratory tool to understand
+how humans participate in power.
 
-**Back-end:** Python (FastAPI)
+### 🚀 Current Focus: Norway 2025
+Launch Target: September 9, 2025 (Election Day)
+Built under contract for a Norwegian news organization, the Norway edition demonstrates the platform's capabilities:
 
-**Front-end:** React + D3 + TailwindCSS
+* Time-travel through elections from 1945 to live 2025 results
+* Geographic exploration from national trends to individual municipalities
+* Live election night with real-time vote counting and exit polls
+* Contextual data linking voting patterns to demographics and economics
 
-**Data:** Parquet/CSV on S3
+### 🛠 Technical Architecture
+**Backend:** Python (FastAPI) + PostgreSQL
+**Frontend:** React + D3.js + TailwindCSS
+**Data Pipelines:**  ETLs serving data from official sources
+**Mapping:** GeoJSON/TopoJSON with custom cartographic optimizations
+**Infrastructure:** Docker + Kubernetes on cloud hosting
+**Built for scale:** Modular architecture designed to expand to global constituencies.
 
-**CI/CD:** GitHub Actions → Docker → Kubernetes
+### 🗺 The Bigger Picture
+Norway provides a proof of concept. The global atlas will integrate:
 
-**Mapping:** geoJSON, TopoJSON, Shapely/Geopandas
+* Electoral data from every democracy
+* Electoral data from non-democracies
+* Historical context
+* Demographic context
+* Economic context
+* Democracy indices (Economist, Freedom House, V-Dem)
+* Contextual intelligence distinguishing meaningful elections from performance
+* Historical depth showing how democracy evolves or devolves
 
-## 📅 Roadmap
-   -  Milestone	Target Date
-   -  Historical ETL pipeline	2025-05-15
-   -  Basic UI & slider	2025-06-01
-   -  Live-data integration	2025-07-01
-   -  Styling & polish	2025-07-20
-   -  Launch date	2025-08-01
+**Target users:** Students, researchers, journalists, anyone curious about how the world governs itself and would enjoy it.
 
+### 📅 Roadmap
 
-📄 License
-MIT © Ben Holden 2025
+* **Q3 2025:** Norway launch + technical validation
+* **Q4 2025:** Architecture for global expansion
+* **Q4 2025:** United States
+* **2026:** Core democratic countries
+* **Beyond:** Global coverage with contextual democracy analysis
+
+### 🎯 Why This Matters
+Current election visualization tools are fragmented, unavailable, outdated, or focus only on single countries. 
+Democracy Atlas provides a one-stop shop to understand democratic participation globally.
+
+MIT License © 2025 Ben Holden
+
+Contact: ben.luc.holden@gmail.com
