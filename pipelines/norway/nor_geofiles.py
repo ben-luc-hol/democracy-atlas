@@ -1,5 +1,4 @@
 import requests
-import xml.etree.ElementTree as ET
 import json
 import zipfile
 import io
@@ -7,39 +6,52 @@ import geopandas as gpd
 import pandas as pd
 from pipelines.utils.s3manager import S3Manager
 from datetime import date, datetime as dt
-from collections import defaultdict
 import tempfile
 import os
 
-
 class NorGeoProcessor:
     """
-    Class to identify, create mappings, fetch, process, and store GeoJSON files for Norwegian administrative subdivisions:
+    Class to identify, map, ingest, process, and store geographic data for Norway.
 
-    Administrative divisions:
-    - Level 1 / L1: Counties (pre-2021) or electoral districts (2021 - current)
-    - Level 2 / L2: Municipalities
+    Administrative division levels:
+    - Counties ("Fylker"):
+        * 1st level administrative units for local elections and public administration.
+        * Level code = "1A"
+    - Electoral Districts ("Valgdistrikt"):
+        * 1st level administrative units for national election purposes
+        * Historically the same as Level "1A" until the 2021 national election
+        * Level code = "1B"
+    - Municipalities ("Kommuner"):
+        * 2nd level administrative units.
+    - Precincts ("Valgkretser"):
+        * 3rd level administrative units for public elections, where available.
 
-    Level 2 units in particular have merged and changed over time, including changing which Level 1 unit they belong to.
-    The class treats each year separately and uses a SCD Type II table to map the continuity  of administrative unit relationships.
+    Boundaries and makeup of administrative divisions have changed over time.
+    The class treats each year separately and uses a SCD Type II table to map the historical changes in administrative unit relationships at levels 1 and 2.
 
-    APIs:
+    DATA SOURCES:
         * SSB (Statistics Bureau):
             - API endpoint for geographic unit code data from 1945 to current year
-            - API endpoint for continuity and correspondence tables
-
+            - API endpoint used for continuity and correspondence tables
 
         * Kartverket (Mapping Authority):
-            - Source for mapping data from 1997 to the current year; ATOM XML feed gives url endpoints for geospatial data
+            - Source for geographic data from 1997 to the current year
             - Files from 2019 to current year are available as straight GeoJSON files
-            - Files from 1997 - 2018 are available as single SOSI file that's handled accordingly
+            - Files from 1997 - 2018 are available as single SOSI file (unique format for Norway) that's handled accordingly.
 
-    #         Uses ATOM feeds in XML from Kartverket (official mapping authority) to:
-    #           - ID and download GeoJSON files, available from 2019 and onwards
-    #           - Download SOSI files (pre-2019) and parse geometries
-    #           - Stores per-level, per-year GeoJSON to AWS S3
-    #           - Emit per-year dimension records for SCD2 table
+    DATA PROCESSING:
+        *Raw Data
+            *Geographic unit mappings
+            *GeoJSON files
 
+        *Processed Data
+            *SCD Type II
+            *Geographic Units (parquet)
+            *TopoJSON files
+            *Views for front-end
+
+    DATA STORAGE:
+        *AWS S3
     """
     def __init__(self, year):
         self.year = year
@@ -51,17 +63,25 @@ class NorGeoProcessor:
         self.geodata = "geodata/country=Norway/"
         self.dimensions = "dimensions/country=Norway/"
 
-    def get_and_store_ssb_data(self, year=None):
+    def get_region_mappings(self, year=None):
         """
-        Method to call SSB API and process a raw subdivision keymap valid for that year.
+        Method to call SSB APIs and generate mapping dictionaries of the administrative
+        divisions that are valid for that particular year.
+
+            * Level 1A dictionary mapping counties to their respective constituent municipalities
+            * Level 1B dictionary mapping electoral districts to their respective constituent municipalities
+            * Level 2A dictionary mapping municipalities to their respective constituent precincts
+
+        Generates and stores JSON data for administrative divisions valid for that year.
+
         :param year: year to get subdivisions for, defaults to 'self.year' if None
-        :return: dictionary with metadata and subdivisions
+        :returns list(dict): [level 1A dict, level 1B dict, level 2A dict]
         """
 
         if not year:
             year = self.year
 
-        key = f"raw/country=norway/year={year}/subdivision_keymap.json"
+        key = f"raw/country=norway/year={year}/geography/L1_to_L2_keymap.json"
 
         subdivision_codes = self.get_subdivision_codes(year=year)
 
@@ -81,19 +101,18 @@ class NorGeoProcessor:
         )
         return data
 
-    def get_subdivision_codes(self, year=None):
+    @classmethod
+    def get_subdivision_codes(self, year):
         """
         Gets subdivision codes in use for the specified year from SSB
         :param year: year to get subdivisions for, defaults to 'self.year' if None
+        :param level: level code to get subdivisions for ('1A', '1B', '2A')
         :return:
         """
 
-        if not year:
-            year = self.year
-
         level_2_endpoint = '131'
 
-        if self.year > 2020:
+        if year > 2020:
             level_1_endpoint = '543'
         else:
             level_1_endpoint = '104'
@@ -127,7 +146,8 @@ class NorGeoProcessor:
             })
         return list(level_1_dict.values())
 
-    def process_geofiles(self, year=None):
+
+    def get_geodata(self, year=None, keymap: dict = None):
         """
         Method to get and process GeoJSON data from Norway's mapping authority valid during the specified year.
         Stores geoJSON data in S3.
@@ -138,37 +158,123 @@ class NorGeoProcessor:
         if not year:
             year = self.year
 
+        if not keymap:
+            keymap = self.s3.read_json(
+                key=f"raw/country=norway/year={year}/subdivision_keymap.json"
+            )
+
         zip_url, file_type = self.get_direct_zip_url(year=year)
 
+        if file_type == "SOSI":
+            gdf_all_L2 = self.L2_gdf_from_sosi(zip_url)
+        elif file_type == "GeoJson":
+            gdf_all_L2 = self.L2_gdf_from_geojson(zip_url)
+        else:
+            raise ValueError(f"Invalid file type: {file_type}")
+
+        gdfs_single_L1 = []
+        for L1_region in keymap.keys()
+            gdf_filtered_L2 = self.process_individual_L2(L1_region, gdf_all_L2)
+            gdf_single_L1 = self.build_L1(L1_region, gdf_filtered_L2)
+            gdfs_single_L1.append(gdf_single_L1)
+        gdf_all_L1 = pd.concat(gdfs_single_L1)
+
+        self.consolidate_L1(gdf_all_L1)
+        self.consolidate_L2(gdf_all_L2)
+
+
+
+
+
+
+        level_1_gdfs = self.process_individual_L2(level_2_gdf)
+        self.process_individual_L1(level_1_gdfs)
+        self.process_consolidated_L
+    def process_individual_L2(self, gdf):
+        pass
+
+
+
+    def L2_gdf_from_geojson(self, zip_url: str):
+        """
+        Processes a GeoJSON for a particular year from .zip file url to output
+        Returns a processed GeoDataFrame containing all Level 2 subdivisions
+        :param zip_url:
+        :return: GeoDataFrame
+        """
         zip_bytes = requests.get(zip_url).content
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            name = [n for n in zf.namelist() if n.lower().endswith('.geojson')][0]
+            with zf.open(name) as f:
+                gdf = gpd.read_file(f, layer="Kommune")
 
-        region_keymap = self.s3.read_json(
-            key = f"raw/country=norway/year={year}/subdivision_keymap.json"
-        )
+            gdf = gdf.rename(
+                columns={
+                    "oppdateringsdato": "latest_update",
+                    "datauttaksdato": "retrieved_at",
+                    "kommunenummer": "level_2_code",
+                    "kommunenavn": "level_2_name",
+                    "gyldigFra": "valid_from",
+                    "gyldigTil": "valid_to"
+                }
+            )
+            gdf['level_1_code'] = None
+            gdf['retrieved_at'] = gdf['retrieved_at'].dt.strftime('%Y-%m-%d')
+            gdf['latest_update'] = gdf['latest_update'].dt.strftime('%Y-%m-%d')
+            gdf['valid_from'] = pd.to_datetime(gdf['valid_from'], format='%Y%m%d', errors='coerce').dt.strftime(
+                '%Y-%m-%d')
+            gdf['valid_to'] = pd.to_datetime(gdf['valid_to'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
 
-        if file_type == "GeoJSON":
-            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-                name = [n for n in zf.namelist() if n.lower().endswith('.geojson')][0]
-                with zf.open(name) as f:
-                    gdf = gpd.read_file(f, layer="Kommune")
+            gdf = gdf[['level_2_code', 'level_2_name', 'level_1_code', 'retrieved_at', 'latest_update', 'valid_from',
+                       'valid_to', 'geometry']].copy()
+            return gdf
 
-                gdf = gdf.rename(
-                        columns={
-                            "oppdateringsdato":"latest_update",
-                            "datauttaksdato":"retrieved_at",
-                            "kommunenummer":"level_2_code",
-                            "kommunenavn":"level_2_name",
-                            "gyldigFra":"valid_from",
-                            "gyldigTil":"valid_to"
-                        }
-                    )
-                gdf['level_1_code'] = None
-                gdf['retrieved_at'] = gdf['retrieved_at'].dt.strftime('%Y-%m-%d')
-                gdf['latest_update'] = gdf['latest_update'].dt.strftime('%Y-%m-%d')
-                gdf['valid_from'] = pd.to_datetime(gdf['valid_from'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
-                gdf['valid_to'] = pd.to_datetime(gdf['valid_to'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
+    def L2_gdf_from_sosi(self, zip_url: str):
+        pass
 
-                gdf = gdf[['level_2_code', 'level_2_name', 'level_1_code', 'retrieved_at', 'latest_update', 'valid_from', 'valid_to', 'geometry']].copy()
+
+    def process_geofiles(self, year=None):
+        """
+        Method to get and process GeoJSON data from Norway's mapping authority valid during the specified year.
+        Stores geoJSON data in S3.
+
+        :param year: year for which to get subdivision data. Defaults to 'self.year' if None
+        :return:
+        """
+        # if not year:
+        #     year = self.year
+        #
+        # zip_url, file_type = self.get_direct_zip_url(year=year)
+        #
+        # zip_bytes = requests.get(zip_url).content
+        #
+        # region_keymap = self.s3.read_json(
+        #     key = f"raw/country=norway/year={year}/subdivision_keymap.json"
+        # )
+
+        # if file_type == "GeoJSON":
+        #     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        #         name = [n for n in zf.namelist() if n.lower().endswith('.geojson')][0]
+        #         with zf.open(name) as f:
+        #             gdf = gpd.read_file(f, layer="Kommune")
+        #
+        #         gdf = gdf.rename(
+        #                 columns={
+        #                     "oppdateringsdato":"latest_update",
+        #                     "datauttaksdato":"retrieved_at",
+        #                     "kommunenummer":"level_2_code",
+        #                     "kommunenavn":"level_2_name",
+        #                     "gyldigFra":"valid_from",
+        #                     "gyldigTil":"valid_to"
+        #                 }
+        #             )
+        #         gdf['level_1_code'] = None
+        #         gdf['retrieved_at'] = gdf['retrieved_at'].dt.strftime('%Y-%m-%d')
+        #         gdf['latest_update'] = gdf['latest_update'].dt.strftime('%Y-%m-%d')
+        #         gdf['valid_from'] = pd.to_datetime(gdf['valid_from'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
+        #         gdf['valid_to'] = pd.to_datetime(gdf['valid_to'], format='%Y%m%d', errors='coerce').dt.strftime('%Y-%m-%d')
+        #
+        #         gdf = gdf[['level_2_code', 'level_2_name', 'level_1_code', 'retrieved_at', 'latest_update', 'valid_from', 'valid_to', 'geometry']].copy()
 
             region_gdfs = []
 
@@ -302,8 +408,6 @@ class NorGeoProcessor:
 
         return result
 
-
-
     def get_direct_zip_url(self, year):
 
         CURRENT_YEAR = date.today().year
@@ -323,28 +427,26 @@ class NorGeoProcessor:
             # Fallback to 1997 for earlier years
             return f"https://nedlasting.geonorge.no/geonorge/Basisdata/AdministrativeEnheter1997/SOSI/Basisdata_0000_Norge_25833_AdministrativeEnheter1997_SOSI.zip", "SOSI"
 
-    def get_geojson(self, feed, l2_code):
-        """
-           Gets GeoJSON file for a single level 2 subdivision
-           :param feed:
-           :param l2_code:
-           :return:
-           """
-        entry = [e for e in feed if e['l2_code'] == l2_code][0]
-        zip_url = entry['url']
-
-        gdf = gdf.set_crs("EPSG:4258", allow_override=True)
-
-        gdf = gdf.rename(
-            columns={
-                "oppdateringsdato": "last_updated",
-                "datauttaksdato": "request_date",
-                "kommunenummer": "l2_code",
-                "gyldigFra": "valid_from",
-                "gyldigTil": "valid_to"
-            })
-
-        return gdf
+    # def get_geojson(self, feed, l2_code):
+    #     """
+    #        Gets GeoJSON file for a single level 2 subdivision
+    #        :param feed:
+    #        :param l2_code:
+    #        :return:
+    #        """
+    #     entry = [e for e in feed if e['l2_code'] == l2_code][0]
+    #     zip_url = entry['url']
+    #
+    #     gdf = gdf.rename(
+    #         columns={
+    #             "oppdateringsdato": "last_updated",
+    #             "datauttaksdato": "request_date",
+    #             "kommunenummer": "l2_code",
+    #             "gyldigFra": "valid_from",
+    #             "gyldigTil": "valid_to"
+    #         })
+    #
+    #     return gdf
 
 
     # def get_correspondence(self, ):
