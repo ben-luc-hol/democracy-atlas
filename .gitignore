@@ -1,0 +1,9 @@
+__pychache__
+notebooks/
+pipelines/public_data_processor.py
+pipelines/utils/aggregation.py
+**/__pycache__/
+/nrp_ip.ipynb
+scripts/
+data/
+.idea
