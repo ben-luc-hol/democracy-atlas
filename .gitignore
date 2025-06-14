@@ -1,9 +1,13 @@
 __pychache__
 notebooks/
-pipelines/public_data_processor.py
-pipelines/utils/aggregation.py
+src/public_data_processor.py
+src/utils/aggregation.py
 **/__pycache__/
 /nrp_ip.ipynb
-scripts/
+code-landfill/
 data/
 .idea
+.DS_Store
+/code-landfill
+src/utils/logging_manager.py
+src/utils/s3manager.py

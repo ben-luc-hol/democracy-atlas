@@ -29,7 +29,7 @@ Built under contract for a Norwegian news organization, the Norway edition demon
 
 ### 🛠 Technical Architecture
 **Backend:** Python (FastAPI) + PostgreSQL
-**Frontend:** React + D3.js + TailwindCSS
+**Frontend:** React + D3.js + TailwindCSS. Serving static files.
 **Data Pipelines:**  ETLs serving data from official sources
 **Mapping:** GeoJSON/TopoJSON with custom cartographic optimizations
 **Infrastructure:** Docker + Kubernetes on cloud hosting

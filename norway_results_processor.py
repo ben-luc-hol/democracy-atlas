@@ -2,7 +2,7 @@ import requests
 import json
 from datetime import datetime as dt
 from .results_processor import ResultsPipeline
-from .pipelines.utils.s3manager import S3Manager
+from .src.utils.s3manager import S3Manager
 
 
 class NorwayPipeline(ResultsPipeline):

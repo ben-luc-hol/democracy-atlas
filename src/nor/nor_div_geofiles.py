@@ -4,7 +4,7 @@ import zipfile
 import io
 import geopandas as gpd
 import pandas as pd
-from pipelines.utils.s3manager import S3Manager
+from src.utils.s3manager import S3Manager
 from datetime import date, datetime as dt
 import tempfile
 import os
@@ -81,7 +81,7 @@ class NorGeoProcessor:
         if not year:
             year = self.year
 
-        key = f"raw/country=norway/year={year}/geography/L1_to_L2_keymap.json"
+        key = f"raw/country=nor/year={year}/geography/L1_to_L2_keymap.json"
 
         subdivision_codes = self.get_subdivision_codes(year=year)
 
@@ -160,7 +160,7 @@ class NorGeoProcessor:
 
         if not keymap:
             keymap = self.s3.read_json(
-                key=f"raw/country=norway/year={year}/subdivision_keymap.json"
+                key=f"raw/country=nor/year={year}/subdivision_keymap.json"
             )
 
         zip_url, file_type = self.get_direct_zip_url(year=year)
@@ -181,11 +181,6 @@ class NorGeoProcessor:
 
         self.consolidate_L1(gdf_all_L1)
         self.consolidate_L2(gdf_all_L2)
-
-
-
-
-
 
         level_1_gdfs = self.process_individual_L2(level_2_gdf)
         self.process_individual_L1(level_1_gdfs)
@@ -249,7 +244,7 @@ class NorGeoProcessor:
         # zip_bytes = requests.get(zip_url).content
         #
         # region_keymap = self.s3.read_json(
-        #     key = f"raw/country=norway/year={year}/subdivision_keymap.json"
+        #     key = f"raw/country=nor/year={year}/subdivision_keymap.json"
         # )
 
         # if file_type == "GeoJSON":
@@ -295,7 +290,7 @@ class NorGeoProcessor:
 
                         geojson_dict = json.loads(filtered_gdf.to_json())
 
-                        path = f"shapefiles/country=norway/year={year}/level=2/{level_2_code}"
+                        path = f"shapefiles/country=nor/year={year}/level=2/{level_2_code}"
                         self.s3.write_json(data=geojson_dict,key=path, indent=2)
 
                         district_gdfs.append(geojson_dict)
@@ -309,7 +304,7 @@ class NorGeoProcessor:
                     simplified_l2_gdf['geometry'] = simplified_l2_gdf.geometry.simplify(0.001, preserve_topology=True)
                     simplified_geojson = json.loads(simplified_l2_gdf.to_json())
 
-                    path = f"views/country=norway/year={year}/level=2/simplified.geojson"
+                    path = f"views/country=nor/year={year}/level=2/simplified.geojson"
                     self.s3.write_json(data=simplified_geojson, key=path, indent=2)
 
 
@@ -324,19 +319,19 @@ class NorGeoProcessor:
                     level_1_gdf = gpd.GeoDataFrame([level_1_data], geometry='geometry', crs=gdf.crs)
                     level_1_geojson = json.loads(level_1_gdf.to_json())
 
-                    path = f"shapefiles/country=norway/level=1/{level_1_code}.geojson"
+                    path = f"shapefiles/country=nor/level=1/{level_1_code}.geojson"
                     self.s3.write_json(data=level_1_geojson,key=path, indent=2)
                     region_gdfs.append(level_1_gdf)
 
                     simplified_district_gdf = level_1_gdf.copy()
                     simplified_district_gdf['geometry'] = simplified_district_gdf.geometry.simplify(0.001, preserve_topology=True)
                     simplified_district_geojson = json.loads(simplified_district_gdf.to_json())
-                    path = f"shapefiles/country=norway/year={year}/level=1/simplified/{level_1_code}.geojson"
+                    path = f"shapefiles/country=nor/year={year}/level=1/simplified/{level_1_code}.geojson"
 
             if region_gdfs:
                 all_level_1 = pd.concat(region_gdfs, ignore_index=True)
                 all_level_1_geojson = json.loads(all_level_1.to_json())
-                path = f"shapefiles/country=norway/year={year}/level=1/simplified.geojson"
+                path = f"shapefiles/country=nor/year={year}/level=1/simplified.geojson"
                 self.s3.write_json(data=all_level_1_geojson, key = path, indent=2)
 
 
@@ -354,11 +349,11 @@ class NorGeoProcessor:
             l2_path = os.path.join(tmpdir, "level_2.geojson")
 
             # Output path
-            topo_path = os.path.join(tmpdir, "norway.topojson")
+            topo_path = os.path.join(tmpdir, "nor.topojson")
 
             # Get consolidated GeoJSON files from S3
-            l1_geojson = self.s3.read_json(f"shapefiles/country=norway/year={year}/consolidated/level_1.geojson")
-            l2_geojson = self.s3.read_json(f"shapefiles/country=norway/year={year}/consolidated/level_2.geojson")
+            l1_geojson = self.s3.read_json(f"shapefiles/country=nor/year={year}/consolidated/level_1.geojson")
+            l2_geojson = self.s3.read_json(f"shapefiles/country=nor/year={year}/consolidated/level_2.geojson")
 
             # Write to temp files
             with open(l1_path, 'w') as f:
@@ -380,7 +375,7 @@ class NorGeoProcessor:
                 topojson_data = json.load(f)
 
             # Save to S3
-            web_path = f"views/country=norway/year={year}/norway.topojson"
+            web_path = f"views/country=nor/year={year}/nor.topojson"
             self.s3.write_json(data=topojson_data, key=web_path)
 
     def level_2_to_dict(geo_df, level_2_code):
